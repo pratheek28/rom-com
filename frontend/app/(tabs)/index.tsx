@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, Text} from "react-native";
 import { useEffect, useState } from "react";
 import { Calendar } from "@/components/calendar";
 import { ProgressBar } from "@/components/progress-bar";
@@ -23,10 +23,7 @@ export default function HomeScreen() {
   });
   return (
     <View style={styles.container}>
-      <ProgressBar
-        hoursWorked={hoursWorked}
-        hoursGoal={hoursGoal}
-      />
+      {hoursWorked > 0 ? <ProgressBar hoursWorked={hoursWorked} hoursGoal={hoursGoal} /> : <Text className="text-white text-xl font-semibold text-center mb-20">Loading Data...</Text>}
       <Calendar />
     </View>
   );
