@@ -14,8 +14,8 @@ module.exports = ({ config }) => ({
     EXPO_PUBLIC_ELEVENLABS_API_KEY:
       process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY ?? "",
     EXPO_PUBLIC_ELEVENLABS_VOICE_ID:
-      process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? "",
+      process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? "zNsotODqUhvbJ5wMG7Ei",
     EXPO_PUBLIC_ELEVENLABS_MODEL_ID:
-      process.env.EXPO_PUBLIC_ELEVENLABS_MODEL_ID ?? "",
+      process.env.EXPO_PUBLIC_ELEVENLABS_MODEL_ID ?? "eleven_flash_v2_5",
   },
 });
