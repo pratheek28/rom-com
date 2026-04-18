@@ -17,8 +17,8 @@ export default function ProfileScreen() {
       <View className="px-6 gap-8">
         {[
           { label: 'Sex', value: 'Male' },
-          { label: 'Height', value: '5\' 11\'\'' },
-          { label: 'Weight', value: '175 lb' },
+          { label: 'Height', value: '9\' 11\'\'' },
+          { label: 'Weight', value: '10075 lb' },
           { label: 'Date of Birth', value: 'Jan 12, 1994' },
         ].map(({ label, value }) => (
           <View
