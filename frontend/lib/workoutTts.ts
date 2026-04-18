@@ -74,7 +74,7 @@ export async function speakWorkoutCue(text: string): Promise<SpeakWorkoutResult>
   const voiceId =
     env("EXPO_PUBLIC_ELEVENLABS_VOICE_ID") ?? "21m00Tcm4TlvDq8ikWAM";
   const modelId =
-    env("EXPO_PUBLIC_ELEVENLABS_MODEL_ID") ?? "eleven_multilingual_v2";
+    env("EXPO_PUBLIC_ELEVENLABS_MODEL_ID") ?? "eleven_v3";
 
   if (!apiKey) {
     return {
