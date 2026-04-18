@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
-
+import { Calendar } from "@/components/calendar";
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Hello World</Text>
+      <Calendar/>
     </View>
   );
 }
