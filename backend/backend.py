@@ -24,6 +24,3 @@ def get_workout_goal():
         "curr_weekly_hours": userData["curr_weekly_hours"],
         "goal_weekly_hours": userData["goal_weekly_hours"],
     }
-
-if __name__ == "__get_workout_goal__":
-    get_workout_goal()
