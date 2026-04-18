@@ -300,7 +300,6 @@ export default function WorkoutScreen() {
   );
 
   return (
-    <ScrollView className="flex-1 mt-20">
     <View style={styles.container}>
 
       {webError ? (
@@ -313,36 +312,142 @@ export default function WorkoutScreen() {
       ) : null}
 
       {workoutSummary ? (
-        <View style={styles.summaryWrap}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryEyebrow}>Workout complete</Text>
-            <Text style={styles.summaryTitle}>
-              Nice work on {workoutSummary.exerciseTitle}
+        <View
+      style={{
+        flex: 1,
+        backgroundColor: "#0B0B0B",
+        justifyContent: "space-between",
+        padding: 24,
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 32,
+            fontWeight: "600",
+            color: "#FFFFFF",
+            marginBottom: 8,
+          }}
+        >
+          Workout complete
+        </Text>
+
+        <Text
+          style={{
+            fontSize: 20,
+            color: "#CCCCCC",
+            marginBottom: 12,
+          }}
+        >
+          {workoutSummary.exerciseTitle}
+        </Text>
+
+        <Text
+          style={{
+            fontSize: 16,
+            color: "#888888",
+            marginBottom: 32,
+          }}
+        >
+          You got through it — nice work.
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+          }}
+        >
+          <View style={{ alignItems: "center", flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "600",
+                color: "#FFFFFF",
+              }}
+            >
+              {workoutSummary.sets}
             </Text>
-            <Text style={styles.summarySubtitle}>
-              You finished the workout and completed every target you set.
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#888888",
+                marginTop: 4,
+              }}
+            >
+              Sets
             </Text>
-            <View style={styles.summaryStats}>
-              <View style={styles.summaryStat}>
-                <Text style={styles.summaryStatValue}>{workoutSummary.sets}</Text>
-                <Text style={styles.summaryStatLabel}>Sets</Text>
-              </View>
-              <View style={styles.summaryStat}>
-                <Text style={styles.summaryStatValue}>{workoutSummary.reps}</Text>
-                <Text style={styles.summaryStatLabel}>Reps</Text>
-              </View>
-              <View style={styles.summaryStat}>
-                <Text style={styles.summaryStatValue}>
-                  {workoutSummary.breakSeconds}s
-                </Text>
-                <Text style={styles.summaryStatLabel}>Break</Text>
-              </View>
-            </View>
-            <Pressable style={styles.homeButton} onPress={resetToHome}>
-              <Text style={styles.homeButtonText}>Back to home</Text>
-            </Pressable>
+          </View>
+
+          <View style={{ alignItems: "center", flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "600",
+                color: "#FFFFFF",
+              }}
+            >
+              {workoutSummary.reps}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#888888",
+                marginTop: 4,
+              }}
+            >
+              Reps
+            </Text>
+          </View>
+
+          <View style={{ alignItems: "center", flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "600",
+                color: "#FFFFFF",
+              }}
+            >
+              {workoutSummary.breakSeconds}s
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#888888",
+                marginTop: 4,
+              }}
+            >
+              Break
+            </Text>
           </View>
         </View>
+      </View>
+
+      <Pressable
+        onPress={resetToHome}
+        style={{
+          backgroundColor: "#FFFFFF",
+          paddingVertical: 16,
+          borderRadius: 12,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: "#000000",
+            fontSize: 16,
+            fontWeight: "600",
+          }}
+        >
+          Back to home
+        </Text>
+      </Pressable>
+    </View>
       ) : !selectedExercise && !previewExercise ? (
         <ScrollView
           style={styles.pickerScroll}
@@ -576,12 +681,11 @@ export default function WorkoutScreen() {
         </Animated.View>
       )}
     </View>
-    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a" },
+  container: { flex: 1, backgroundColor: "#0a0a0a", marginTop: 20, paddingTop: 30 },
   summaryWrap: {
     flex: 1,
     paddingHorizontal: 20,

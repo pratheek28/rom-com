@@ -122,7 +122,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 </head>
 <body>
   <div id="wrap">
-    <div id="status">Starting camera…</div>
     <div id="counterHud">
       <div class="counterRow">
         <span class="counterLabel">Set</span>
@@ -140,7 +139,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
   </div>
 
   <script type="module">
-    const statusEl     = document.getElementById('status');
     const feedbackEl   = document.getElementById('feedback');
     const repFlashEl   = document.getElementById('repFlash');
     const setCountEl   = document.getElementById('setCount');
@@ -335,7 +333,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm'
       );
 
-      statusEl.textContent = 'Loading model…';
 
       const fileset = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
@@ -354,7 +351,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
           });
           break;
         } catch {
-          if (delegate === 'GPU') statusEl.textContent = 'GPU unavailable, using CPU…';
+          if (delegate === 'GPU');
           else throw new Error('Could not load model on GPU or CPU');
         }
       }
@@ -381,7 +378,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
         frameCount++;
 
         if (detectionPaused) {
-          statusEl.textContent = 'Break in progress…';
           feedbackEl.textContent = 'Recover and get ready for the next set.';
           feedbackEl.className = 'good';
           requestAnimationFrame(loop);
@@ -411,7 +407,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
               flashRepGlow();
             }
 
-            statusEl.textContent = 'Tracking ' + CURRENT_EXERCISE;
 
             feedbackEl.textContent = form.text;
             feedbackEl.className = form.good ? 'good' : 'bad';
@@ -433,7 +428,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 
     } catch (err) {
       const msg = err?.message ?? String(err);
-      statusEl.textContent = 'Error: ' + msg;
       window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'error', message: msg }));
     }
   </script>
