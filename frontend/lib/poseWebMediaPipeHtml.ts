@@ -168,7 +168,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
       }
       return {
         good: errors.length === 0,
-        text: errors.length ? errors.join(' · ') : 'Good form',
       };
     }
 
@@ -184,11 +183,14 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 
     function bumpRep() {
       repCount++;
+      if (repCount === 10) {
       window.ReactNativeWebView?.postMessage(JSON.stringify({
         type: 'repCompleted',
         reps: repCount,
         exercise: CURRENT_EXERCISE,
       }));
+      repCount = 0;
+  }
     }
 
     function countReps(angles, exercise, dtMs) {

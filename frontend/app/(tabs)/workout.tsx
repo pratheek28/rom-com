@@ -12,6 +12,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { WebView } from "react-native-webview";
 
 import {
@@ -55,11 +56,15 @@ if (
 }
 
 export default function WorkoutScreen() {
+  const BREAK_SECONDS = 10;
   const [webError, setWebError] = useState<string | null>(null);
-  const [ttsTesting, setTtsTesting] = useState(false);
   const [selectedExercise, setSelectedExercise] =
     useState<WorkoutExerciseId | null>(null);
+  const [breakTime, setBreakTime] = useState(false);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState(BREAK_SECONDS);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const breakOverlayAnim = useRef(new Animated.Value(0)).current;
+  const breakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (selectedExercise) {
@@ -72,6 +77,36 @@ export default function WorkoutScreen() {
     }
   }, [selectedExercise, fadeAnim]);
 
+  useEffect(() => {
+    Animated.timing(breakOverlayAnim, {
+      toValue: breakTime ? 1 : 0,
+      duration: breakTime ? 320 : 260,
+      useNativeDriver: true,
+    }).start();
+  }, [breakTime, breakOverlayAnim]);
+
+  useEffect(() => {
+    if (!breakTime) {
+      setBreakSecondsLeft(BREAK_SECONDS);
+      return;
+    }
+
+    setBreakSecondsLeft(BREAK_SECONDS);
+    const interval = setInterval(() => {
+      setBreakSecondsLeft((current) => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [breakTime, BREAK_SECONDS]);
+
+  useEffect(() => {
+    return () => {
+      if (breakTimeoutRef.current) {
+        clearTimeout(breakTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const startExercise = useCallback(
     async (id: WorkoutExerciseId, title: string) => {
       setWebError(null);
@@ -83,23 +118,6 @@ export default function WorkoutScreen() {
     },
     []
   );
-
-  const onTestHello = useCallback(async () => {
-    setTtsTesting(true);
-    try {
-      const r = await speakWorkoutCue("Hello.");
-      if (r.ok) {
-        Alert.alert(
-          "Voice test",
-          "Playback started. Turn up volume; on iPhone check the silent switch."
-        );
-      } else {
-        Alert.alert("Voice test failed", r.error);
-      }
-    } finally {
-      setTtsTesting(false);
-    }
-  }, []);
 
   const onMessage = useCallback(
     async (e: { nativeEvent: { data: string } }) => {
@@ -116,8 +134,19 @@ export default function WorkoutScreen() {
         }
         if (data.type === "repCompleted") {
           const n = data.reps ?? 0;
-          const r = await speakWorkoutCue(`Rep ${n}. Nice work.`);
+          const r = await speakWorkoutCue(`You have finished 1 set. Now take some rest champ!`);
           if (!r.ok) console.warn("[workout] rep TTS:", r.error);
+          if (breakTimeoutRef.current) {
+            clearTimeout(breakTimeoutRef.current);
+          }
+          setBreakSecondsLeft(BREAK_SECONDS);
+          setBreakTime(true);
+          breakTimeoutRef.current = setTimeout(async () => {
+            setBreakTime(false);
+            const d = await speakWorkoutCue(`Rest Over! Next settt`);
+            if (!d.ok) console.warn("[workout] end TTS:", d.error);
+            breakTimeoutRef.current = null;
+          }, BREAK_SECONDS * 1000);
         }
         if (data.type === "speakRequest" && data.text) {
           const r = await speakWorkoutCue(data.text);
@@ -158,9 +187,7 @@ export default function WorkoutScreen() {
           <Text style={styles.screenTitle}>Choose exercise</Text>
           {!isWorkoutTtsConfigured() ? (
             <Text style={styles.hint}>
-              Add EXPO_PUBLIC_ELEVENLABS_API_KEY (and optional
-              EXPO_PUBLIC_ELEVENLABS_VOICE_ID) for voice cues. Never put the key
-              in the WebView HTML.
+              Add api key
             </Text>
           ) : null}
 
@@ -219,17 +246,25 @@ export default function WorkoutScreen() {
               )
             }
           />
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Camera runs inside the WebView.{" "}
-              <Text
-                style={styles.link}
-                onPress={() => void Linking.openSettings()}
-              >
-                System settings
-              </Text>
-            </Text>
-          </View>
+          <Animated.View
+            pointerEvents={breakTime ? "auto" : "none"}
+            style={[
+              styles.breakOverlayWrap,
+              {
+                opacity: breakOverlayAnim,
+              },
+            ]}
+          >
+            <BlurView intensity={55} tint="dark" style={styles.breakOverlayBlur}>
+              <View style={styles.breakOverlayCard}>
+                <Text style={styles.breakTitle}>Take a break</Text>
+                <Text style={styles.breakSubtitle}>
+                  Recover for a few seconds, then continue.
+                </Text>
+                <Text style={styles.breakTimer}>{breakSecondsLeft}s</Text>
+              </View>
+            </BlurView>
+          </Animated.View>
         </Animated.View>
       )}
     </View>
@@ -318,6 +353,48 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   webview: { flex: 1, backgroundColor: "#000" },
+  breakOverlayWrap: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 6,
+  },
+  breakOverlayBlur: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.22)",
+    paddingHorizontal: 24,
+  },
+  breakOverlayCard: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(18,18,18,0.35)",
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    gap: 8,
+  },
+  breakTitle: {
+    color: "#fff",
+    fontSize: 30,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  breakSubtitle: {
+    color: "#ddd",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  breakTimer: {
+    color: "#9ae6b4",
+    fontSize: 34,
+    fontWeight: "800",
+    textAlign: "center",
+    marginTop: 4,
+  },
   footer: {
     paddingHorizontal: 12,
     paddingVertical: 8,

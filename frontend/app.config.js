@@ -16,6 +16,6 @@ module.exports = ({ config }) => ({
     EXPO_PUBLIC_ELEVENLABS_VOICE_ID:
       process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? "zNsotODqUhvbJ5wMG7Ei",
     EXPO_PUBLIC_ELEVENLABS_MODEL_ID:
-      process.env.EXPO_PUBLIC_ELEVENLABS_MODEL_ID ?? "eleven_flash_v2_5",
+      process.env.EXPO_PUBLIC_ELEVENLABS_MODEL_ID ?? "eleven_v3",
   },
 });
