@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Animated,
-  Linking,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +16,7 @@ import { WebView } from "react-native-webview";
 import {
   getPoseWebMediaPipeHtml,
   type WorkoutExerciseId,
+  type WorkoutWebConfig,
 } from "@/lib/poseWebMediaPipeHtml";
 import {
   isWorkoutTtsConfigured,
@@ -25,25 +24,89 @@ import {
 } from "@/lib/workoutTts";
 
 const WEBVIEW_BASE_URL = "https://expo.dev";
+const EXERCISE_GIF = require("../../assets/images/curl.gif");
+const SQUAT_GIF = require("../../assets/images/squat.gif");
+
+const DEFAULT_WORKOUT_CONFIG = {
+  sets: 3,
+  reps: 10,
+  breakSeconds: 10,
+};
+
+type WorkoutConfig = WorkoutWebConfig;
+
+type ExerciseItem = {
+  id: WorkoutExerciseId;
+  title: string;
+  description: string;
+  gif: number;
+};
+
+type WorkoutSummary = {
+  exerciseTitle: string;
+  sets: number;
+  reps: number;
+  breakSeconds: number;
+};
 
 const SECTIONS: {
   label: string;
-  items: { id: WorkoutExerciseId; title: string }[];
+  items: ExerciseItem[];
 }[] = [
-  { label: "Routine", items: [{ id: "routine", title: "routine" }] },
+  {
+    label: "Routine", 
+    items: [
+      {
+        id: "routine",
+        title: "routine",
+        description: "A guided full-body sequence with tempo coaching.",
+        gif: EXERCISE_GIF,
+      },
+    ],
+  },
   {
     label: "Upper",
     items: [
-      { id: "curl", title: "curl" },
-      { id: "ex2", title: "ex2" },
+      {
+        id: "curl",
+        title: "curl",
+        description: "Focuses on controlled bicep contraction each rep.",
+        gif: EXERCISE_GIF,
+      },
+      {
+        id: "ex2",
+        title: "ex2",
+        description: "Upper-body accessory movement for added volume.",
+        gif: EXERCISE_GIF,
+      },
     ],
   },
-  { label: "Core", items: [{ id: "Plank", title: "Plank" }] },
+  {
+    label: "Core",
+    items: [
+      {
+        id: "Plank",
+        title: "Plank",
+        description: "Build core stability while maintaining a neutral spine.",
+        gif: EXERCISE_GIF,
+      },
+    ],
+  },
   {
     label: "Lower",
     items: [
-      { id: "squat", title: "squat" },
-      { id: "ex3", title: "ex3" },
+      {
+        id: "squat",
+        title: "squat",
+        description: "Strengthens glutes and quads with strict depth control.",
+        gif: SQUAT_GIF,
+      },
+      {
+        id: "ex3",
+        title: "ex3",
+        description: "Lower-body support movement for balanced training.",
+        gif: EXERCISE_GIF,
+      },
     ],
   },
 ];
@@ -56,15 +119,27 @@ if (
 }
 
 export default function WorkoutScreen() {
-  const BREAK_SECONDS = 10;
   const [webError, setWebError] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] =
     useState<WorkoutExerciseId | null>(null);
+  const [previewExercise, setPreviewExercise] = useState<ExerciseItem | null>(
+    null
+  );
+  const [activeExerciseTitle, setActiveExerciseTitle] = useState("");
+  const [activeConfig, setActiveConfig] = useState<WorkoutConfig>(
+    DEFAULT_WORKOUT_CONFIG
+  );
+  const [workoutSummary, setWorkoutSummary] = useState<WorkoutSummary | null>(
+    null
+  );
   const [breakTime, setBreakTime] = useState(false);
-  const [breakSecondsLeft, setBreakSecondsLeft] = useState(BREAK_SECONDS);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState(
+    DEFAULT_WORKOUT_CONFIG.breakSeconds
+  );
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const breakOverlayAnim = useRef(new Animated.Value(0)).current;
   const breakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webViewRef = useRef<WebView | null>(null);
 
   useEffect(() => {
     if (selectedExercise) {
@@ -87,17 +162,23 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     if (!breakTime) {
-      setBreakSecondsLeft(BREAK_SECONDS);
+      setBreakSecondsLeft(activeConfig.breakSeconds);
       return;
     }
 
-    setBreakSecondsLeft(BREAK_SECONDS);
+    setBreakSecondsLeft(activeConfig.breakSeconds);
     const interval = setInterval(() => {
       setBreakSecondsLeft((current) => Math.max(current - 1, 0));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [breakTime, BREAK_SECONDS]);
+  }, [breakTime, activeConfig.breakSeconds]);
+
+  useEffect(() => {
+    if (!selectedExercise || !webViewRef.current) return;
+    const payload = JSON.stringify({ type: "breakState", active: breakTime });
+    webViewRef.current.postMessage(payload);
+  }, [breakTime, selectedExercise]);
 
   useEffect(() => {
     return () => {
@@ -107,16 +188,39 @@ export default function WorkoutScreen() {
     };
   }, []);
 
+  const openExercisePreview = useCallback((item: ExerciseItem) => {
+    setPreviewExercise(item);
+    setActiveConfig(DEFAULT_WORKOUT_CONFIG);
+  }, []);
+
+  const resetToHome = useCallback(() => {
+    setBreakTime(false);
+    setBreakSecondsLeft(DEFAULT_WORKOUT_CONFIG.breakSeconds);
+    setSelectedExercise(null);
+    setPreviewExercise(null);
+    setWorkoutSummary(null);
+    setActiveExerciseTitle("");
+    if (breakTimeoutRef.current) {
+      clearTimeout(breakTimeoutRef.current);
+      breakTimeoutRef.current = null;
+    }
+  }, []);
+
   const startExercise = useCallback(
-    async (id: WorkoutExerciseId, title: string) => {
+    async (exercise: ExerciseItem) => {
       setWebError(null);
-      setSelectedExercise(id);
-      const r = await speakWorkoutCue(`Starting ${title}. Let's go.`);
+      setWorkoutSummary(null);
+      setPreviewExercise(null);
+      setSelectedExercise(exercise.id);
+      setActiveExerciseTitle(exercise.title);
+      const r = await speakWorkoutCue(
+        `Starting ${exercise.title}. ${activeConfig.sets} sets, ${activeConfig.reps} reps each. Let's go.`
+      );
       if (!r.ok) {
         console.warn("[workout] start TTS:", r.error);
       }
     },
-    []
+    [activeConfig]
   );
 
   const onMessage = useCallback(
@@ -128,25 +232,56 @@ export default function WorkoutScreen() {
           reps?: number;
           exercise?: string;
           text?: string;
+          completedSets?: number;
+          totalSets?: number;
+          repsPerSet?: number;
         };
         if (data.type === "error" && data.message) {
           setWebError(data.message);
         }
-        if (data.type === "repCompleted") {
-          const n = data.reps ?? 0;
-          const r = await speakWorkoutCue(`You have finished 1 set. Now take some rest champ!`);
+        if (data.type === "setCompleted") {
+          const isWorkoutDone =
+            (data.completedSets ?? 0) >= (data.totalSets ?? activeConfig.sets);
+          const r = await speakWorkoutCue(
+            isWorkoutDone
+              ? "Workout complete. Amazing job."
+              : `Set ${data.completedSets ?? 1} complete. Now take some rest champ!`
+          );
           if (!r.ok) console.warn("[workout] rep TTS:", r.error);
+          if (isWorkoutDone) {
+            setBreakTime(false);
+            if (breakTimeoutRef.current) {
+              clearTimeout(breakTimeoutRef.current);
+              breakTimeoutRef.current = null;
+            }
+            return;
+          }
           if (breakTimeoutRef.current) {
             clearTimeout(breakTimeoutRef.current);
           }
-          setBreakSecondsLeft(BREAK_SECONDS);
+          setBreakSecondsLeft(activeConfig.breakSeconds);
           setBreakTime(true);
           breakTimeoutRef.current = setTimeout(async () => {
             setBreakTime(false);
             const d = await speakWorkoutCue(`Rest Over! Next set`);
             if (!d.ok) console.warn("[workout] end TTS:", d.error);
             breakTimeoutRef.current = null;
-          }, BREAK_SECONDS * 1000);
+          }, activeConfig.breakSeconds * 1000);
+        }
+        if (data.type === "workoutCompleted") {
+          setBreakTime(false);
+          if (breakTimeoutRef.current) {
+            clearTimeout(breakTimeoutRef.current);
+            breakTimeoutRef.current = null;
+          }
+          setSelectedExercise(null);
+          setPreviewExercise(null);
+          setWorkoutSummary({
+            exerciseTitle: activeExerciseTitle || "Exercise",
+            sets: data.totalSets ?? activeConfig.sets,
+            reps: data.repsPerSet ?? activeConfig.reps,
+            breakSeconds: activeConfig.breakSeconds,
+          });
         }
         if (data.type === "speakRequest" && data.text) {
           const r = await speakWorkoutCue(data.text);
@@ -156,18 +291,17 @@ export default function WorkoutScreen() {
         /* ignore */
       }
     },
-    []
+    [
+      activeConfig.breakSeconds,
+      activeConfig.reps,
+      activeConfig.sets,
+      activeExerciseTitle,
+    ]
   );
 
   return (
+    <ScrollView className="flex-1 mt-20">
     <View style={styles.container}>
-      <View style={styles.ttsDebugBar}>
-        <Text style={styles.ttsDebugHint}>
-          {isWorkoutTtsConfigured()
-            ? ""
-            : "set 11lab api key"}
-        </Text>
-      </View>
 
       {webError ? (
         <View style={styles.errorBox}>
@@ -178,7 +312,38 @@ export default function WorkoutScreen() {
         </View>
       ) : null}
 
-      {!selectedExercise ? (
+      {workoutSummary ? (
+        <View style={styles.summaryWrap}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryEyebrow}>Workout complete</Text>
+            <Text style={styles.summaryTitle}>
+              Nice work on {workoutSummary.exerciseTitle}
+            </Text>
+            <Text style={styles.summarySubtitle}>
+              You finished the workout and completed every target you set.
+            </Text>
+            <View style={styles.summaryStats}>
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryStatValue}>{workoutSummary.sets}</Text>
+                <Text style={styles.summaryStatLabel}>Sets</Text>
+              </View>
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryStatValue}>{workoutSummary.reps}</Text>
+                <Text style={styles.summaryStatLabel}>Reps</Text>
+              </View>
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryStatValue}>
+                  {workoutSummary.breakSeconds}s
+                </Text>
+                <Text style={styles.summaryStatLabel}>Break</Text>
+              </View>
+            </View>
+            <Pressable style={styles.homeButton} onPress={resetToHome}>
+              <Text style={styles.homeButtonText}>Back to home</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : !selectedExercise && !previewExercise ? (
         <ScrollView
           style={styles.pickerScroll}
           contentContainerStyle={styles.pickerContent}
@@ -194,40 +359,183 @@ export default function WorkoutScreen() {
           {SECTIONS.map((section) => (
             <View key={section.label} style={styles.section}>
               <Text style={styles.sectionLabel}>{section.label}</Text>
-              <View style={styles.chipRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.exerciseRowContent}
+              >
                 {section.items.map((item) => (
                   <Pressable
                     key={item.id}
                     style={({ pressed }) => [
-                      styles.chip,
-                      pressed && styles.chipPressed,
+                      styles.exerciseCard,
+                      pressed && styles.exerciseCardPressed,
                     ]}
-                    onPress={() => void startExercise(item.id, item.title)}
+                    onPress={() => openExercisePreview(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choose ${item.title}`}
                   >
-                    <Text style={styles.chipText}>{item.title}</Text>
+                    <Image source={item.gif} style={styles.exerciseGif} />
+                    <Text style={styles.exerciseName}>{item.title}</Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             </View>
           ))}
         </ScrollView>
+      ) : previewExercise ? (
+        <View style={styles.confirmWrap}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => setPreviewExercise(null)}
+          >
+            <Text style={styles.backBtnText}>← Back to exercises</Text>
+          </Pressable>
+          <ScrollView
+            style={styles.confirmScroll}
+            contentContainerStyle={styles.confirmContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Image source={previewExercise.gif} style={styles.confirmGif} />
+            <Text style={styles.confirmTitle}>{previewExercise.title}</Text>
+            <Text style={styles.confirmDescription}>
+              {previewExercise.description}
+            </Text>
+
+            <View style={styles.configCard}>
+              <View style={styles.stepperRow}>
+                <Text style={styles.stepperLabel}>Sets</Text>
+                <View style={styles.stepperControls}>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        sets: Math.max(1, prev.sets - 1),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease sets"
+                  >
+                    <Text style={styles.stepperBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValue}>{activeConfig.sets}</Text>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        sets: Math.min(20, prev.sets + 1),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase sets"
+                  >
+                    <Text style={styles.stepperBtnText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.stepperRow}>
+                <Text style={styles.stepperLabel}>Reps</Text>
+                <View style={styles.stepperControls}>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        reps: Math.max(1, prev.reps - 1),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease reps"
+                  >
+                    <Text style={styles.stepperBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValue}>{activeConfig.reps}</Text>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        reps: Math.min(200, prev.reps + 1),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase reps"
+                  >
+                    <Text style={styles.stepperBtnText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.stepperRow}>
+                <Text style={styles.stepperLabel}>Break (sec)</Text>
+                <View style={styles.stepperControls}>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        breakSeconds: Math.max(0, prev.breakSeconds - 5),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease break time"
+                  >
+                    <Text style={styles.stepperBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValue}>
+                    {activeConfig.breakSeconds}
+                  </Text>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() =>
+                      setActiveConfig((prev) => ({
+                        ...prev,
+                        breakSeconds: Math.min(600, prev.breakSeconds + 5),
+                      }))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase break time"
+                  >
+                    <Text style={styles.stepperBtnText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.confirmFooter}>
+            <Pressable
+              style={styles.startButton}
+              onPress={() => void startExercise(previewExercise)}
+            >
+              <Text style={styles.startButtonText}>START</Text>
+            </Pressable>
+          </View>
+        </View>
       ) : (
         <Animated.View style={[styles.webWrap, { opacity: fadeAnim }]}>
           <View style={styles.toolbar}>
             <Pressable
               style={styles.backBtn}
-              onPress={() => setSelectedExercise(null)}
+              onPress={() => {
+                setSelectedExercise(null);
+                setPreviewExercise(null);
+              }}
             >
               <Text style={styles.backBtnText}>← Exercises</Text>
             </Pressable>
-            <Text style={styles.toolbarTitle}>{selectedExercise}</Text>
+            <Text style={styles.toolbarTitle}>{activeExerciseTitle}</Text>
           </View>
           <WebView
+            ref={webViewRef}
             style={styles.webview}
             originWhitelist={["*"]}
-            key={selectedExercise}
+            key={selectedExercise ?? "none"}
             source={{
-              html: getPoseWebMediaPipeHtml(selectedExercise),
+              html: getPoseWebMediaPipeHtml(selectedExercise!, activeConfig),
               baseUrl: WEBVIEW_BASE_URL,
             }}
             allowsInlineMediaPlayback
@@ -268,11 +576,83 @@ export default function WorkoutScreen() {
         </Animated.View>
       )}
     </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0a0a" },
+  summaryWrap: {
+    flex: 1,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryCard: {
+    width: "100%",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#2f3d33",
+    backgroundColor: "#111713",
+    padding: 22,
+    gap: 14,
+  },
+  summaryEyebrow: {
+    color: "#9ae6b4",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  summaryTitle: {
+    color: "#fff",
+    fontSize: 30,
+    fontWeight: "900",
+    lineHeight: 36,
+  },
+  summarySubtitle: {
+    color: "#bcc7bf",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  summaryStats: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 6,
+  },
+  summaryStat: {
+    flex: 1,
+    backgroundColor: "#1a221c",
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 6,
+  },
+  summaryStatValue: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "900",
+  },
+  summaryStatLabel: {
+    color: "#97a19a",
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  homeButton: {
+    marginTop: 8,
+    borderRadius: 16,
+    backgroundColor: "#9ae6b4",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+  },
+  homeButtonText: {
+    color: "#0c2814",
+    fontSize: 18,
+    fontWeight: "900",
+  },
   ttsDebugBar: {
     paddingHorizontal: 14,
     paddingTop: 10,
@@ -322,17 +702,117 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 10,
   },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  chip: {
+  exerciseRowContent: { flexDirection: "row", gap: 12, paddingRight: 8 },
+  exerciseCard: {
+    width: 96,
     backgroundColor: "#1e1e1e",
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#333",
+    alignItems: "center",
+    gap: 8,
   },
-  chipPressed: { backgroundColor: "#2a2a2a" },
-  chipText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  exerciseCardPressed: { backgroundColor: "#2a2a2a" },
+  exerciseGif: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+  },
+  exerciseName: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  confirmWrap: { flex: 1, backgroundColor: "#0a0a0a" },
+  confirmScroll: { flex: 1 },
+  confirmContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  confirmGif: {
+    width: "100%",
+    height: 280,
+    borderRadius: 26,
+    marginTop: 8,
+  },
+  confirmTitle: {
+    color: "#fff",
+    fontSize: 30,
+    fontWeight: "800",
+    textTransform: "capitalize",
+  },
+  confirmDescription: {
+    color: "#b9b9b9",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  configCard: {
+    backgroundColor: "#121212",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+    marginTop: 10,
+  },
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  stepperLabel: {
+    color: "#f5f5f5",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  stepperControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  stepperBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#3c3c3c",
+    backgroundColor: "#1c1c1c",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperBtnText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  stepperValue: {
+    minWidth: 44,
+    textAlign: "center",
+    color: "#9ae6b4",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  confirmFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: "#0a0a0a",
+  },
+  startButton: {
+    width: "100%",
+    borderRadius: 16,
+    backgroundColor: "#9ae6b4",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+  },
+  startButtonText: {
+    color: "#0c2814",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
   webWrap: { flex: 1 },
   toolbar: {
     flexDirection: "row",

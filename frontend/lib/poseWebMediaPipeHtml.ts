@@ -7,6 +7,12 @@ export type WorkoutExerciseId =
   | "squat"
   | "ex3";
 
+export type WorkoutWebConfig = {
+  sets: number;
+  reps: number;
+  breakSeconds: number;
+};
+
 const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,6 +37,54 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
       font: 14px system-ui, sans-serif;
       color: #fff; background: rgba(0,0,0,0.55);
     }
+    #counterHud {
+      position: fixed;
+      top: 56px;
+      right: 12px;
+      z-index: 12;
+      min-width: 176px;
+      border-radius: 16px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.64);
+      border: 1px solid rgba(255, 255, 255, 0.26);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #fff;
+    }
+    .counterRow {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .counterLabel {
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.78);
+    }
+    .counterValue {
+      font-size: 30px;
+      font-weight: 900;
+      line-height: 1;
+      color: #9ae6b4;
+      text-shadow: 0 0 16px rgba(154, 230, 180, 0.38);
+      font-variant-numeric: tabular-nums;
+    }
+    #breakBanner {
+      margin-top: 8px;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      color: #ffe9c2;
+      background: rgba(255, 169, 50, 0.28);
+      border: 1px solid rgba(255, 186, 96, 0.45);
+      display: none;
+    }
+    #breakBanner.active { display: block; }
 
     #feedback {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 2;
@@ -69,6 +123,16 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 <body>
   <div id="wrap">
     <div id="status">Starting camera…</div>
+    <div id="counterHud">
+      <div class="counterRow">
+        <span class="counterLabel">Set</span>
+        <span id="setCount" class="counterValue">1/1</span>
+      </div>
+      <div class="counterRow">
+        <span class="counterLabel">Reps</span>
+        <span id="repCount" class="counterValue">0/0</span>
+      </div>
+    </div>
     <video id="video" playsinline autoplay muted></video>
     <canvas id="canvas"></canvas>
     <div id="repFlash" aria-hidden="true"></div>
@@ -79,11 +143,22 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     const statusEl     = document.getElementById('status');
     const feedbackEl   = document.getElementById('feedback');
     const repFlashEl   = document.getElementById('repFlash');
+    const setCountEl   = document.getElementById('setCount');
+    const repCountEl   = document.getElementById('repCount');
     const video        = document.getElementById('video');
     const canvas       = document.getElementById('canvas');
     const ctx          = canvas.getContext('2d');
 
     const CURRENT_EXERCISE = __CURRENT_EXERCISE__;
+    const WORKOUT_CONFIG = __WORKOUT_CONFIG__;
+    let detectionPaused = false;
+
+    function renderCounters() {
+      const currentSet = Math.min(completedSets + 1, WORKOUT_CONFIG.sets);
+      setCountEl.textContent = currentSet + '/' + WORKOUT_CONFIG.sets;
+      repCountEl.textContent = repCount + '/' + WORKOUT_CONFIG.reps;
+    }
+
 
     // Voice: never put API keys in this page. Ask React Native to speak via ElevenLabs:
     // window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'speakRequest', text: 'Your cue' }));
@@ -172,6 +247,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     }
 
     let repCount = 0;
+    let completedSets = 0;
     let lastRepCount = 0;
 
     let curlBottom = false;
@@ -180,17 +256,34 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     let ex3Bottom = false;
     let routineBottom = false;
     let plankHoldMs = 0;
+    renderCounters();
 
     function bumpRep() {
       repCount++;
-      if (repCount === 10) {
-      window.ReactNativeWebView?.postMessage(JSON.stringify({
-        type: 'repCompleted',
-        reps: repCount,
-        exercise: CURRENT_EXERCISE,
-      }));
-      repCount = 0;
-  }
+      if (repCount >= WORKOUT_CONFIG.reps) {
+        completedSets++;
+        window.ReactNativeWebView?.postMessage(JSON.stringify({
+          type: 'setCompleted',
+          reps: repCount,
+          completedSets,
+          totalSets: WORKOUT_CONFIG.sets,
+          exercise: CURRENT_EXERCISE,
+        }));
+
+        repCount = 0;
+        lastRepCount = 0;
+        renderCounters();
+
+        if (completedSets >= WORKOUT_CONFIG.sets) {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({
+            type: 'workoutCompleted',
+            exercise: CURRENT_EXERCISE,
+            totalSets: WORKOUT_CONFIG.sets,
+            repsPerSet: WORKOUT_CONFIG.reps,
+          }));
+        }
+      }
+      renderCounters();
     }
 
     function countReps(angles, exercise, dtMs) {
@@ -287,6 +380,14 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
         lastPerf = now;
         frameCount++;
 
+        if (detectionPaused) {
+          statusEl.textContent = 'Break in progress…';
+          feedbackEl.textContent = 'Recover and get ready for the next set.';
+          feedbackEl.className = 'good';
+          requestAnimationFrame(loop);
+          return;
+        }
+
         if (
           frameCount % DETECT_EVERY_N_FRAMES === 0 &&
           video.readyState >= 2 &&
@@ -310,7 +411,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
               flashRepGlow();
             }
 
-            statusEl.textContent = 'Reps: ' + repCount + ' · ' + CURRENT_EXERCISE;
+            statusEl.textContent = 'Tracking ' + CURRENT_EXERCISE;
 
             feedbackEl.textContent = form.text;
             feedbackEl.className = form.good ? 'good' : 'bad';
@@ -339,9 +440,11 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-export function getPoseWebMediaPipeHtml(exerciseId: WorkoutExerciseId): string {
-  return POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE.replace(
-    "__CURRENT_EXERCISE__",
-    JSON.stringify(exerciseId)
-  );
+export function getPoseWebMediaPipeHtml(
+  exerciseId: WorkoutExerciseId,
+  config: WorkoutWebConfig
+): string {
+  return POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE
+    .replace("__CURRENT_EXERCISE__", JSON.stringify(exerciseId))
+    .replace("__WORKOUT_CONFIG__", JSON.stringify(config));
 }
