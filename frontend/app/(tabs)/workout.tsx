@@ -143,7 +143,7 @@ export default function WorkoutScreen() {
           setBreakTime(true);
           breakTimeoutRef.current = setTimeout(async () => {
             setBreakTime(false);
-            const d = await speakWorkoutCue(`Rest Over! Next settt`);
+            const d = await speakWorkoutCue(`Rest Over! Next set`);
             if (!d.ok) console.warn("[workout] end TTS:", d.error);
             breakTimeoutRef.current = null;
           }, BREAK_SECONDS * 1000);
