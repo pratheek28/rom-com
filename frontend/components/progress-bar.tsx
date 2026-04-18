@@ -1,13 +1,10 @@
 import { View, Text } from "react-native";
-
 type GoalCompletionBarProps = {
-  goalName: string;
   hoursWorked: number;
   hoursGoal: number;
 };
 
 export function ProgressBar({
-  goalName,
   hoursWorked,
   hoursGoal,
 }: GoalCompletionBarProps) {
@@ -17,7 +14,7 @@ export function ProgressBar({
   return (
     <View className="w-11/12 mb-12">
       <Text className="text-white text-xl font-semibold text-center w-full mb-3">
-        {goalName}
+        Weekly Goal
       </Text>
       <View className="w-full h-10 bg-gray-700 rounded-full overflow-hidden">
         <View
