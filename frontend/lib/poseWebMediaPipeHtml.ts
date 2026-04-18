@@ -187,7 +187,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
       repCountEl.textContent = repCount + '/' + WORKOUT_CONFIG.reps;
     }
 
-
     // Voice: never put API keys in this page. Ask React Native to speak via ElevenLabs:
     // window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'speakRequest', text: 'Your cue' }));
 
@@ -256,12 +255,26 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
       ex2:     {},
       squat:   {},
       ex3:     {},
-      Plank:   { leftElbow:  { min: 150, max: 190, label: 'Left arm' }, rightElbow: { min: 150, max: 190, label: 'Right arm' } },
+      Plank:   { leftElbow: { min: 150, max: 190, label: 'Left arm' }, rightElbow: { min: 150, max: 190, label: 'Right arm' } },
     };
+
+    const CRITICAL_LANDMARKS = {
+      curl:    [11, 13, 15],
+      routine: [11, 13, 15],
+      ex2:     [12, 14, 16],
+      squat:   [23, 25, 27, 24, 26, 28],
+      ex3:     [23, 25, 27, 24, 26, 28],
+      Plank:   [11, 13, 15, 12, 14, 16],
+    };
+
+    function isCriticalBodyInView(lm, exercise) {
+      const needed = CRITICAL_LANDMARKS[exercise] ?? [];
+      return needed.every(i => (lm[i]?.visibility ?? 0) >= 0.6);
+    }
 
     function checkForm(angles, exercise) {
       const rules = EXERCISES[exercise];
-      if (!rules) return { good: true, text: 'OK' };
+      if (!rules) return { good: true };
       const errors = [];
       for (const [joint, { min, max, label }] of Object.entries(rules)) {
         const angle = angles[joint];
@@ -284,9 +297,46 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     let ex3Bottom = false;
     let routineBottom = false;
     let plankHoldMs = 0;
+
+    function resetRepMotionState() {
+      curlBottom = false;
+      ex2Bottom = false;
+      squatBottom = false;
+      ex3Bottom = false;
+      routineBottom = false;
+      plankHoldMs = 0;
+    }
+
+    function applyBreakState(active) {
+      const on = Boolean(active);
+      const wasPaused = detectionPaused;
+      detectionPaused = on;
+      if (on && !wasPaused) resetRepMotionState();
+    }
+
+    function handleBreakMessageData(raw) {
+      if (raw == null) return;
+      let payload = null;
+      if (typeof raw === 'object' && raw !== null && raw.type === 'breakState') {
+        payload = raw;
+      } else {
+        try {
+          payload = JSON.parse(String(raw));
+        } catch {
+          return;
+        }
+      }
+      if (!payload || payload.type !== 'breakState') return;
+      applyBreakState(payload.active);
+    }
+
+    document.addEventListener('message', (e) => handleBreakMessageData(e.data));
+    window.addEventListener('message', (e) => handleBreakMessageData(e.data));
+
     renderCounters();
 
     function bumpRep() {
+      if (detectionPaused) return;
       repCount++;
       if (repCount >= WORKOUT_CONFIG.reps) {
         completedSets++;
@@ -315,6 +365,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     }
 
     function countReps(angles, exercise, dtMs) {
+      if (detectionPaused) return;
       if (DEBUG_ANGLES_ON_PAGE && angleDebugEl) {
         const NL = String.fromCharCode(10);
         const lines = Object.entries(angles).map(([k, v]) =>
@@ -374,7 +425,6 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm'
       );
 
-
       const fileset = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
       );
@@ -392,8 +442,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
           });
           break;
         } catch {
-          if (delegate === 'GPU');
-          else throw new Error('Could not load model on GPU or CPU');
+          if (delegate !== 'GPU') throw new Error('Could not load model on GPU or CPU');
         }
       }
 
@@ -437,29 +486,39 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
           if (result.landmarks?.[0]) {
             const lm = result.landmarks[0];
 
-            drawSkeleton(lm);
+            if (!isCriticalBodyInView(lm, CURRENT_EXERCISE)) {
+              // Partially out of frame — draw skeleton so they can self-correct
+              drawSkeleton(lm);
+              feedbackEl.textContent = 'Move your full body into view';
+              feedbackEl.className = 'bad';
+            } else {
+              drawSkeleton(lm);
 
-            const angles = getAngles(lm);
-            const form   = checkForm(angles, CURRENT_EXERCISE);
-            countReps(angles, CURRENT_EXERCISE, dtMs);
+              const angles = getAngles(lm);
+              const form   = checkForm(angles, CURRENT_EXERCISE);
+              countReps(angles, CURRENT_EXERCISE, dtMs);
 
-            if (repCount > lastRepCount) {
-              lastRepCount = repCount;
-              flashRepGlow();
+              if (repCount > lastRepCount) {
+                lastRepCount = repCount;
+                flashRepGlow();
+              }
+
+              feedbackEl.textContent = form.text;
+              feedbackEl.className = form.good ? 'good' : 'bad';
+
+              window.ReactNativeWebView?.postMessage(JSON.stringify({
+                type:     'poseData',
+                angles,
+                form:     form.text,
+                formGood: form.good,
+                reps:     repCount,
+                exercise: CURRENT_EXERCISE,
+              }));
             }
-
-
-            feedbackEl.textContent = form.text;
-            feedbackEl.className = form.good ? 'good' : 'bad';
-
-            window.ReactNativeWebView?.postMessage(JSON.stringify({
-              type:     'poseData',
-              angles,
-              form:     form.text,
-              formGood: form.good,
-              reps:     repCount,
-              exercise: CURRENT_EXERCISE,
-            }));
+          } else {
+            // No person detected at all
+            feedbackEl.textContent = 'No person detected — step into view';
+            feedbackEl.className = 'bad';
           }
         }
 

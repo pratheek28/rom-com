@@ -140,6 +140,8 @@ export default function WorkoutScreen() {
   const breakOverlayAnim = useRef(new Animated.Value(0)).current;
   const breakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webViewRef = useRef<WebView | null>(null);
+  const breakTimeRef = useRef(false);
+  breakTimeRef.current = breakTime;
 
   useEffect(() => {
     if (selectedExercise) {
@@ -176,8 +178,14 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     if (!selectedExercise || !webViewRef.current) return;
-    const payload = JSON.stringify({ type: "breakState", active: breakTime });
-    webViewRef.current.postMessage(payload);
+    const payload = JSON.stringify({
+      type: "breakState",
+      active: breakTimeRef.current,
+    });
+    const id = requestAnimationFrame(() => {
+      webViewRef.current?.postMessage(payload);
+    });
+    return () => cancelAnimationFrame(id);
   }, [breakTime, selectedExercise]);
 
   useEffect(() => {
@@ -650,6 +658,14 @@ export default function WorkoutScreen() {
             mixedContentMode="always"
             allowsFullscreenVideo={false}
             onMessage={onMessage}
+            onLoadEnd={() => {
+              webViewRef.current?.postMessage(
+                JSON.stringify({
+                  type: "breakState",
+                  active: breakTimeRef.current,
+                })
+              );
+            }}
             onError={(ev) =>
               setWebError(ev.nativeEvent.description ?? "WebView error")
             }
