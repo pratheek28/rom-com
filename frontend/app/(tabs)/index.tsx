@@ -6,6 +6,7 @@ import { ThreeDayLog } from "@/components/three-day-log";
 export default function HomeScreen() {
   const [hoursWorked, SetHoursWorked] = useState(-1);
   const [hoursGoal, SetHoursGoal] = useState(-1);
+<<<<<<< HEAD
   useEffect(() => {
     const url =
       process.env.EXPO_PUBLIC_WORKOUT_GOAL_URL ??
@@ -17,6 +18,12 @@ export default function HomeScreen() {
           throw new Error(`HTTP ${response.status}`);
         }
         return response.json();
+=======
+    useEffect(() => {
+    try {
+      fetch("https://rom-com.onrender.com/workout-goal", {
+        method: "POST",
+>>>>>>> 40b664826bed87ed57aef72cc8e60f51c38aec02
       })
       .then((data) => {
         SetHoursWorked(data.curr_weekly_hours);
