@@ -8,7 +8,7 @@ export default function HomeScreen() {
   const [hoursGoal, SetHoursGoal] = useState(-1);
     useEffect(() => {
     try {
-      fetch("http://127.0.0.1:8000/workout-goal", {
+      fetch("https://rom-com.onrender.com/workout-goal", {
         method: "POST",
       })
         .then((response) => response.json())
