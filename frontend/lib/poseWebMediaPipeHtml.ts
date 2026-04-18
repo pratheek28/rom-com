@@ -86,6 +86,28 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     }
     #breakBanner.active { display: block; }
 
+    /* Temporary on-page angle debug — set DEBUG_ANGLES_ON_PAGE = false in script to disable */
+    #angleDebug {
+      position: fixed;
+      left: 10px;
+      bottom: 64px;
+      z-index: 11;
+      max-width: min(92vw, 320px);
+      max-height: 32vh;
+      overflow: auto;
+      margin: 0;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace;
+      color: #e8fff4;
+      background: rgba(0, 0, 0, 0.78);
+      border: 1px solid rgba(154, 230, 180, 0.35);
+      white-space: pre-wrap;
+      word-break: break-word;
+      pointer-events: none;
+    }
+    #angleDebug.hidden { display: none; }
+
     #feedback {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 2;
       padding: 12px; text-align: center;
@@ -135,12 +157,14 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     <video id="video" playsinline autoplay muted></video>
     <canvas id="canvas"></canvas>
     <div id="repFlash" aria-hidden="true"></div>
+    <pre id="angleDebug" class="hidden"></pre>
     <div id="feedback"></div>
   </div>
 
   <script type="module">
     const feedbackEl   = document.getElementById('feedback');
     const repFlashEl   = document.getElementById('repFlash');
+    const angleDebugEl = document.getElementById('angleDebug');
     const setCountEl   = document.getElementById('setCount');
     const repCountEl   = document.getElementById('repCount');
     const video        = document.getElementById('video');
@@ -150,6 +174,12 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     const CURRENT_EXERCISE = __CURRENT_EXERCISE__;
     const WORKOUT_CONFIG = __WORKOUT_CONFIG__;
     let detectionPaused = false;
+
+    /** Flip to false when you no longer need live angles on screen */
+    const DEBUG_ANGLES_ON_PAGE = true;
+    if (DEBUG_ANGLES_ON_PAGE && angleDebugEl) {
+      angleDebugEl.classList.remove('hidden');
+    }
 
     function renderCounters() {
       const currentSet = Math.min(completedSets + 1, WORKOUT_CONFIG.sets);
@@ -285,6 +315,17 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     }
 
     function countReps(angles, exercise, dtMs) {
+      if (DEBUG_ANGLES_ON_PAGE && angleDebugEl) {
+        const NL = String.fromCharCode(10);
+        const lines = Object.entries(angles).map(([k, v]) =>
+          k + ': ' + (v == null ? '—' : v.toFixed(1) + '°')
+        );
+        angleDebugEl.textContent =
+          'exercise: ' + exercise + NL +
+          'dt: ' + dtMs.toFixed(1) + ' ms' + NL +
+          '---' + NL +
+          lines.join(NL);
+      }
       if (exercise === 'curl') {
         const a = angles.leftElbow;
         if (a == null) return;
