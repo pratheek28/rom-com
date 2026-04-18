@@ -1,4 +1,13 @@
-export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
+/** Exercise ids used by the WebView pose script (must match workout screen). */
+export type WorkoutExerciseId =
+  | "routine"
+  | "curl"
+  | "ex2"
+  | "Plank"
+  | "squat"
+  | "ex3";
+
+const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -33,7 +42,6 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
     #feedback.good { color: #00ffc8; }
     #feedback.bad  { color: #ff4f4f; }
 
-    /* Full-screen green glow when rep count increases */
     #repFlash {
       position: fixed;
       inset: 0;
@@ -69,11 +77,16 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
 
   <script type="module">
     const statusEl     = document.getElementById('status');
-    const feedbackEl = document.getElementById('feedback');
+    const feedbackEl   = document.getElementById('feedback');
     const repFlashEl   = document.getElementById('repFlash');
     const video        = document.getElementById('video');
     const canvas       = document.getElementById('canvas');
     const ctx          = canvas.getContext('2d');
+
+    const CURRENT_EXERCISE = __CURRENT_EXERCISE__;
+
+    // Voice: never put API keys in this page. Ask React Native to speak via ElevenLabs:
+    // window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'speakRequest', text: 'Your cue' }));
 
     function flashRepGlow() {
       repFlashEl.classList.remove('pulse');
@@ -135,9 +148,12 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
     }
 
     const EXERCISES = {
-      Curl: {
-        leftElbow: { min: 60, max: 100, label: 'Left elbow' },
-      },
+      curl:    {},
+      routine: {},
+      ex2:     {},
+      squat:   {},
+      ex3:     {},
+      Plank:   { leftElbow:  { min: 150, max: 190, label: 'Left arm' }, rightElbow: { min: 150, max: 190, label: 'Right arm' } },
     };
 
     function checkForm(angles, exercise) {
@@ -147,34 +163,77 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
       for (const [joint, { min, max, label }] of Object.entries(rules)) {
         const angle = angles[joint];
         if (angle == null) continue;
-        // if (angle < min) errors.push(label + ' too bent (' + angle.toFixed(0) + '°)');
-        // if (angle > max) errors.push(label + ' too straight (' + angle.toFixed(0) + '°)');
+        if (angle < min) errors.push(label + ' too tight (' + angle.toFixed(0) + '°)');
+        if (angle > max) errors.push(label + ' too open (' + angle.toFixed(0) + '°)');
       }
       return {
         good: errors.length === 0,
+        text: errors.length ? errors.join(' · ') : 'Good form',
       };
     }
 
     let repCount = 0;
     let lastRepCount = 0;
-    let inBottom = false;
 
-    function countReps(angles, exercise) {
-      if (exercise === 'Curl') {
-        const angle = angles.leftElbow;
-        if (angle == null) return;
+    let curlBottom = false;
+    let ex2Bottom = false;
+    let squatBottom = false;
+    let ex3Bottom = false;
+    let routineBottom = false;
+    let plankHoldMs = 0;
 
-        if (!inBottom && angle > 140) {
-          inBottom = true;
-        }
-        if (inBottom && angle < 60) {
-          inBottom = false;
-          repCount++;
+    function bumpRep() {
+      repCount++;
+      window.ReactNativeWebView?.postMessage(JSON.stringify({
+        type: 'repCompleted',
+        reps: repCount,
+        exercise: CURRENT_EXERCISE,
+      }));
+    }
+
+    function countReps(angles, exercise, dtMs) {
+      if (exercise === 'curl') {
+        const a = angles.leftElbow;
+        if (a == null) return;
+        if (!curlBottom && a > 140) curlBottom = true;
+        if (curlBottom && a < 60) { curlBottom = false; bumpRep(); }
+      } else if (exercise === 'routine') {
+        const a = angles.leftElbow;
+        if (a == null) return;
+        if (!routineBottom && a > 140) routineBottom = true;
+        if (routineBottom && a < 60) { routineBottom = false; bumpRep(); }
+      } else if (exercise === 'ex2') {
+        const a = angles.rightElbow;
+        if (a == null) return;
+        if (!ex2Bottom && a > 140) ex2Bottom = true;
+        if (ex2Bottom && a < 60) { ex2Bottom = false; bumpRep(); }
+      } else if (exercise === 'squat') {
+        const lk = angles.leftKnee, rk = angles.rightKnee;
+        if (lk == null || rk == null) return;
+        const avg = (lk + rk) / 2;
+        if (!squatBottom && avg < 110) squatBottom = true;
+        if (squatBottom && avg > 155) { squatBottom = false; bumpRep(); }
+      } else if (exercise === 'ex3') {
+        const lk = angles.leftKnee, rk = angles.rightKnee;
+        if (lk == null || rk == null) return;
+        const avg = (lk + rk) / 2;
+        if (!ex3Bottom && avg < 115) ex3Bottom = true;
+        if (ex3Bottom && avg > 150) { ex3Bottom = false; bumpRep(); }
+      } else if (exercise === 'Plank') {
+        const le = angles.leftElbow, re = angles.rightElbow;
+        if (le == null || re == null) return;
+        const ok = le > 150 && re > 150;
+        if (ok) {
+          plankHoldMs += dtMs;
+          if (plankHoldMs >= 5000) {
+            plankHoldMs = 0;
+            bumpRep();
+          }
+        } else {
+          plankHoldMs = 0;
         }
       }
     }
-
-    const CURRENT_EXERCISE = 'Curl';
 
     try {
       const { PoseLandmarker, FilesetResolver } = await import(
@@ -218,8 +277,12 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
       const DETECT_EVERY_N_FRAMES = 2;
       let frameCount = 0;
       let lastTime   = -1;
+      let lastPerf   = performance.now();
 
       function loop() {
+        const now = performance.now();
+        const dtMs = Math.min(80, now - lastPerf);
+        lastPerf = now;
         frameCount++;
 
         if (
@@ -238,14 +301,14 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
 
             const angles = getAngles(lm);
             const form   = checkForm(angles, CURRENT_EXERCISE);
-            countReps(angles, CURRENT_EXERCISE);
+            countReps(angles, CURRENT_EXERCISE, dtMs);
 
             if (repCount > lastRepCount) {
               lastRepCount = repCount;
               flashRepGlow();
             }
 
-            statusEl.textContent = 'Reps: ' + repCount;
+            statusEl.textContent = 'Reps: ' + repCount + ' · ' + CURRENT_EXERCISE;
 
             feedbackEl.textContent = form.text;
             feedbackEl.className = form.good ? 'good' : 'bad';
@@ -256,6 +319,7 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
               form:     form.text,
               formGood: form.good,
               reps:     repCount,
+              exercise: CURRENT_EXERCISE,
             }));
           }
         }
@@ -272,3 +336,10 @@ export const POSE_WEB_MEDIA_PIPE_HTML = `<!DOCTYPE html>
   </script>
 </body>
 </html>`;
+
+export function getPoseWebMediaPipeHtml(exerciseId: WorkoutExerciseId): string {
+  return POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE.replace(
+    "__CURRENT_EXERCISE__",
+    JSON.stringify(exerciseId)
+  );
+}
