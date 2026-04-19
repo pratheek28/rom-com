@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
   },
   labelText: {
-    color: "#0c1924",
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 14,
   },
