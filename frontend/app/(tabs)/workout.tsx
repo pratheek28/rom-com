@@ -97,6 +97,12 @@ const SECTIONS: {
         description: "Upper-body accessory movement for added volume.",
         gif: EXERCISE_GIF,
       },
+      {
+        id: "lateral_raise",
+        title: "Lateral Raise",
+        description: "Raise arms out to sides to shoulder height, controlled descent.",
+        gif: EXERCISE_GIF,
+      },
     ],
   },
   {

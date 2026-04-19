@@ -5,7 +5,8 @@ export type WorkoutExerciseId =
   | "ex2"
   | "Plank"
   | "squat"
-  | "ex3";
+  | "ex3"
+  | "lateral_raise";
 
 export type WorkoutWebConfig = {
   sets: number;
@@ -239,32 +240,36 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
 
     function getAngles(lm) {
       return {
-        leftElbow:  getAngle(lm[11], lm[13], lm[15]),
-        rightElbow: getAngle(lm[12], lm[14], lm[16]),
-        leftKnee:   getAngle(lm[23], lm[25], lm[27]),
-        rightKnee:  getAngle(lm[24], lm[26], lm[28]),
-        leftHip:    getAngle(lm[11], lm[23], lm[25]),
-        rightHip:   getAngle(lm[12], lm[24], lm[26]),
-        torso:      getAngle(lm[12], lm[11], lm[23]),
+        leftElbow:             getAngle(lm[11], lm[13], lm[15]),
+        rightElbow:            getAngle(lm[12], lm[14], lm[16]),
+        leftKnee:              getAngle(lm[23], lm[25], lm[27]),
+        rightKnee:             getAngle(lm[24], lm[26], lm[28]),
+        leftHip:               getAngle(lm[11], lm[23], lm[25]),
+        rightHip:              getAngle(lm[12], lm[24], lm[26]),
+        torso:                 getAngle(lm[12], lm[11], lm[23]),
+        leftShoulder:  getAngle(lm[23], lm[11], lm[13]),
+        rightShoulder: getAngle(lm[24], lm[12], lm[14]),
       };
     }
 
     const EXERCISES = {
-      curl:    {},
-      routine: {},
-      ex2:     {},
-      squat:   {},
-      ex3:     {},
-      Plank:   { leftElbow: { min: 150, max: 190, label: 'Left arm' }, rightElbow: { min: 150, max: 190, label: 'Right arm' } },
+      curl:          {},
+      routine:       {},
+      ex2:           {},
+      squat:         {},
+      ex3:           {},
+      Plank:         { leftElbow: { min: 150, max: 190, label: 'Left arm' }, rightElbow: { min: 150, max: 190, label: 'Right arm' } },
+      lateral_raise: {},
     };
 
     const CRITICAL_LANDMARKS = {
-      curl:    [11, 13, 15],
-      routine: [11, 13, 15],
-      ex2:     [12, 14, 16],
-      squat:   [23, 25, 27, 24, 26, 28],
-      ex3:     [23, 25, 27, 24, 26, 28],
-      Plank:   [11, 13, 15, 12, 14, 16],
+      curl:          [11, 13, 15],
+      routine:       [11, 13, 15],
+      ex2:           [12, 14, 16],
+      squat:         [23, 25, 27, 24, 26, 28],
+      ex3:           [23, 25, 27, 24, 26, 28],
+      Plank:         [11, 13, 15, 12, 14, 16],
+      lateral_raise: [11, 12, 13, 14, 23, 24],
     };
 
     function isCriticalBodyInView(lm, exercise) {
@@ -297,6 +302,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
     let ex3Bottom = false;
     let routineBottom = false;
     let plankHoldMs = 0;
+    let lateralRaiseDown = false;
 
     function resetRepMotionState() {
       curlBottom = false;
@@ -305,6 +311,7 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
       ex3Bottom = false;
       routineBottom = false;
       plankHoldMs = 0;
+      lateralRaiseDown = false;
     }
 
     function applyBreakState(active) {
@@ -404,6 +411,12 @@ const POSE_WEB_MEDIA_PIPE_HTML_TEMPLATE = `<!DOCTYPE html>
         const avg = (lk + rk) / 2;
         if (!ex3Bottom && avg < 115) ex3Bottom = true;
         if (ex3Bottom && avg > 150) { ex3Bottom = false; bumpRep(); }
+      } else if (exercise === 'lateral_raise') {
+        const la = angles.leftShoulder, ra = angles.rightShoulder;
+        if (la == null || ra == null) return;
+        const avg = (la + ra) / 2;
+        if (!lateralRaiseDown && avg < 40) lateralRaiseDown = true;
+        if (lateralRaiseDown && avg > 75) { lateralRaiseDown = false; bumpRep(); }
       } else if (exercise === 'Plank') {
         const le = angles.leftElbow, re = angles.rightElbow;
         if (le == null || re == null) return;
