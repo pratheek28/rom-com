@@ -1,15 +1,21 @@
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 type GoalCompletionBarProps = {
   hoursWorked: number;
   hoursGoal: number;
+  streak?: number;
 };
 
 const FILL = "#7dd3fc";
 const TRACK = "#3f3f46";
 
-export function ProgressBar({ hoursWorked, hoursGoal }: GoalCompletionBarProps) {
+export function ProgressBar({
+  hoursWorked,
+  hoursGoal,
+  streak = 12,
+}: GoalCompletionBarProps) {
   const progress =
     hoursGoal > 0 ? Math.min(hoursWorked / hoursGoal, 1) : 0;
   const percent = Math.round(progress * 100);
@@ -55,10 +61,17 @@ export function ProgressBar({ hoursWorked, hoursGoal }: GoalCompletionBarProps) 
     <Animated.View
       style={[
         styles.weeklyWrap,
-        { opacity: entranceOpacity, transform: [{ translateY: entranceShift }] },
+        {
+          opacity: entranceOpacity,
+          transform: [{ translateY: entranceShift }],
+        },
       ]}
     >
-      <Text style={styles.weeklyTitle}>Weekly Goal</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.weeklyTitleInline}>Weekly Goal</Text>
+        <MaterialCommunityIcons name="fire" size={26} color="#f97316" />
+        <Text style={styles.streakText}>{streak}</Text>
+      </View>
       <View style={styles.track}>
         <Animated.View
           style={[
@@ -88,13 +101,23 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     marginBottom: 48,
   },
-  weeklyTitle: {
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 12,
+    width: "100%",
+  },
+  weeklyTitleInline: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "600",
-    textAlign: "center",
-    width: "100%",
-    marginBottom: 12,
+  },
+  streakText: {
+    color: "#fb923c",
+    fontSize: 20,
+    fontWeight: "700",
   },
   track: {
     width: "100%",
@@ -148,6 +171,14 @@ const styles = StyleSheet.create({
     backgroundColor: TRACK,
     overflow: "hidden",
     justifyContent: "center",
+  },
+  weeklyTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "600",
+    textAlign: "center",
+    width: "100%",
+    marginBottom: 12,
   },
 });
 
