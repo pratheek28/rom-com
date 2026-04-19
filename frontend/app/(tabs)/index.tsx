@@ -7,8 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 
 
+
 export default function HomeScreen() {
-  const [hoursWorked, SetHoursWorked] = useState(-1);
+  const [hoursWorked, SetHoursWorked] = useState(-1); //For pushing
   const [hoursGoal, SetHoursGoal] = useState(-1);
     useFocusEffect(
       useCallback(() => {
