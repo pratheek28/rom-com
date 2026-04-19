@@ -16,7 +16,10 @@ type CalendarProps = {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function fmt(d: Date) {
-  return d.toISOString().split("T")[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getCurrentPeriod(): Date[] {
@@ -49,6 +52,12 @@ export function Calendar({ markedDates = {}, onDayPress }: CalendarProps) {
   const week2 = days.slice(7);
   const todayStr = fmt(new Date());
 
+  const handleDayPress = (dateStr: string) => {
+    if (markedDates[dateStr]?.marked) {
+      onDayPress?.(dateStr);
+    }
+  };
+
   const renderDay = (date: Date) => {
     const dateStr = fmt(date);
     const isToday = dateStr === todayStr;
@@ -58,27 +67,19 @@ export function Calendar({ markedDates = {}, onDayPress }: CalendarProps) {
     return (
       <TouchableOpacity
         key={dateStr}
-        onPress={() => onDayPress?.(dateStr)}
+        onPress={() => handleDayPress(dateStr)}
         className="flex-1 items-center py-2"
       >
         <View
           className={`w-9 h-9 rounded-full items-center justify-center ${
             isSelected
-              ? "bg-blue-400"
+              ? "bg-blue-500"
               : isToday
-                ? "bg-blue-300"
+                ? "bg-blue-400"
                 : "bg-transparent"
           }`}
         >
-          <Text
-            className={
-              isSelected || isToday
-                ? "text-white"
-                : "text-white"
-            }
-          >
-            {date.getDate()}
-          </Text>
+          <Text className="text-white">{date.getDate()}</Text>
         </View>
         {mark?.marked && (
           <View
@@ -90,16 +91,22 @@ export function Calendar({ markedDates = {}, onDayPress }: CalendarProps) {
     );
   };
 
-  const monthLabel = new Date().toLocaleString("default", { month: "long", year: "numeric" });
+  const monthLabel = new Date().toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
-    <View className="bg-gray-800 rounded-2xl py-3 w-11/12">
+    <View className="bg-white/5 rounded-2xl py-3 w-11/12">
       <Text className="text-white text-base font-semibold text-center mb-2">
         {monthLabel}
       </Text>
       <View className="flex-row mb-1">
         {DAY_LABELS.map((label) => (
-          <Text key={label} className="flex-1 text-center text-xs font-medium text-white">
+          <Text
+            key={label}
+            className="flex-1 text-center text-xs font-medium text-white"
+          >
             {label}
           </Text>
         ))}
