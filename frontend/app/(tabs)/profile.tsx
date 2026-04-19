@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Text, View, ScrollView } from 'react-native';
+import { Text, View, ScrollView, Button } from 'react-native';
 import ProfilePic from '@/components/profilepic';
 import { useState, useEffect } from 'react';
 import { Dropdown } from 'react-native-element-dropdown';
@@ -21,6 +21,12 @@ export default function ProfileScreen() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (name){
+      getUserData(name);
+    }
+  }, [name]);
 
   function getUserData(name: string) { //For pushing purposes
     AsyncStorage.setItem('name', name);
@@ -80,6 +86,19 @@ export default function ProfileScreen() {
             <Text className="text-white text-sm font-semibold">{value}</Text>
           </View>
         ))}
+      </View>
+
+      <View className="mx-6 h-px bg-white/10 mb-8" />
+
+      <View className="px-6 gap-8">
+        <Button
+          title="Logout"
+          onPress={() => {
+            AsyncStorage.removeItem('name');
+            setName(null);
+            setUserData(null);
+          }}
+        />
       </View>
     </ScrollView>
   );
