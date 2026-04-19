@@ -5,29 +5,44 @@ import { Calendar } from "@/components/calendar";
 import { ProgressBar } from "@/components/progress-bar";
 import { ThreeDayLog } from "@/components/three-day-log";
 import { WorkoutDayModal } from "@/components/workout-day-modal";
+
+type WorkoutGoalResponse = {
+  curr_weekly_hours: number;
+  goal_weekly_hours: number;
+};
+
 export default function HomeScreen() {
   const [hoursWorked, SetHoursWorked] = useState(-1);
   const [hoursGoal, SetHoursGoal] = useState(-1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
   useEffect(() => {
-    try {
-      fetch("https://rom-com.onrender.com/workout-goal", {
-        method: "POST",
+    const url =
+      process.env.EXPO_PUBLIC_WORKOUT_GOAL_URL ??
+      "https://rom-com.onrender.com/workout-goal";
+
+    fetch(url, { method: "POST" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json() as Promise<WorkoutGoalResponse>;
       })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log(data.curr_weekly_hours);
-          SetHoursWorked(data.curr_weekly_hours);
-          SetHoursGoal(data.goal_weekly_hours);
-        });
-    } catch (e) {
-      console.log(e);
-    }
-  });
+      .then((data) => {
+        SetHoursWorked(data.curr_weekly_hours);
+        SetHoursGoal(data.goal_weekly_hours);
+      })
+      .catch((e) => {
+        console.warn("[home] workout-goal fetch failed:", e);
+        SetHoursWorked(0);
+        SetHoursGoal(0);
+      });
+  }, []);
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.container}>
-        {hoursWorked > 0 ? (
+        {hoursWorked >= 0 ? (
           <ProgressBar hoursWorked={hoursWorked} hoursGoal={hoursGoal} />
         ) : (
           <Text className="text-white text-xl font-semibold text-center mb-20">
