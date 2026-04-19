@@ -22,7 +22,7 @@ import { ConfettiStars } from "@/components/confetti-stars";
 import { WeeklyGoalDeltaBar } from "@/components/progress-bar";
 import {
   isWorkoutTtsConfigured,
-  speakWorkoutCue,
+  speakWorkoutCueWithStoredVoice,
 } from "@/lib/workoutTts";
 
 const WEBVIEW_BASE_URL = "https://expo.dev";
@@ -277,7 +277,7 @@ export default function WorkoutScreen() {
       setPreviewExercise(null);
       setSelectedExercise(exercise.id);
       setActiveExerciseTitle(exercise.title);
-      const r = await speakWorkoutCue(
+      const r = await speakWorkoutCueWithStoredVoice(
         `Starting ${exercise.title}. ${activeConfig.sets} sets, ${activeConfig.reps} reps each. Let's go.`
       );
       if (!r.ok) {
@@ -306,7 +306,7 @@ export default function WorkoutScreen() {
         if (data.type === "setCompleted") {
           const isWorkoutDone =
             (data.completedSets ?? 0) >= (data.totalSets ?? activeConfig.sets);
-          const r = await speakWorkoutCue(
+          const r = await speakWorkoutCueWithStoredVoice(
             isWorkoutDone
               ? "Workout complete. Amazing job."
               : `Set ${data.completedSets ?? 1} complete. Now take some rest champ!`
@@ -327,7 +327,7 @@ export default function WorkoutScreen() {
           setBreakTime(true);
           breakTimeoutRef.current = setTimeout(async () => {
             setBreakTime(false);
-            const d = await speakWorkoutCue(`Rest Over! Next set`);
+            const d = await speakWorkoutCueWithStoredVoice(`Rest Over! Next set`);
             if (!d.ok) console.warn("[workout] end TTS:", d.error);
             breakTimeoutRef.current = null;
           }, activeConfig.breakSeconds * 1000);
@@ -353,7 +353,7 @@ export default function WorkoutScreen() {
           });
         }
         if (data.type === "speakRequest" && data.text) {
-          const r = await speakWorkoutCue(data.text);
+          const r = await speakWorkoutCueWithStoredVoice(data.text);
           if (!r.ok) console.warn("[workout] speakRequest TTS:", r.error);
         }
       } catch {

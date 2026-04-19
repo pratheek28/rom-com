@@ -12,6 +12,10 @@ import {
 import ProfilePic from '@/components/profilepic';
 import { useState, useEffect } from 'react';
 import { Dropdown } from 'react-native-element-dropdown';
+import {
+  COACH_VOICE_ID_STORAGE_KEY,
+  speakWorkoutCue,
+} from '@/lib/workoutTts';
 
 const LANGUAGES = [
   'English',
@@ -31,15 +35,18 @@ const data = [
 
 type UserDataRow = { sex: string; height: string; user_weight: string };
 
+const COACHES = [
+  { name: 'Bob', img: require('../../assets/images/coach1.png'), voiceId: 'MiueK1FXuZTCItgbQwPu' },
+  { name: 'Alice', img: require('../../assets/images/coach2.png'), voiceId: 'S1GxattMxHrXozy2QM7J' },
+  { name: 'Kevin', img: require('../../assets/images/coach3.png'), voiceId: '7cOBG34AiHrAzs842Rdi' },
+];
+
 export default function ProfileScreen() {
-  const people = [
-    { name: 'Alice', img: require('../../assets/images/coach1.png') },
-    { name: 'Bob', img: require('../../assets/images/coach1.png') },
-  ];
   const [language, setLanguage] = useState('English');
   const [showPicker, setShowPicker] = useState(false);
   const [userData, setUserData] = useState<UserDataRow | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [coachVoiceId, setCoachVoiceId] = useState<string | null>(null);
 
   function getUserData(userName: string) {
     AsyncStorage.setItem('name', userName);
@@ -63,7 +70,18 @@ export default function ProfileScreen() {
         getUserData(saved);
       }
     });
+    AsyncStorage.getItem(COACH_VOICE_ID_STORAGE_KEY).then((savedVoice) => {
+      if (savedVoice) setCoachVoiceId(savedVoice);
+    });
   }, []);
+
+  async function onSelectCoach(voiceId: string) {
+    await AsyncStorage.setItem(COACH_VOICE_ID_STORAGE_KEY, voiceId);
+    setCoachVoiceId(voiceId);
+    const who = name?.trim() ? name.trim() : 'there';
+    const r = await speakWorkoutCue(`Hello, ${who}. Let's get after it!`, { voiceId });
+    if (!r.ok) console.warn('[profile] coach preview TTS:', r.error);
+  }
 
   const profileRows = userData
     ? [
@@ -120,17 +138,34 @@ export default function ProfileScreen() {
       <View className="px-6 gap-8 mt-10">
         <Text className="text-white text-2xl font-bold">Personalize your Coach</Text>
         <View className="flex-row items-center gap-8">
-          {people.map((person, index) => (
-            <View key={index} style={{ alignItems: 'center' }}>
-              <Image
-                source={person.img}
-                style={{ width: 100, height: 100, borderRadius: 50 }}
-              />
-              <Text style={{ marginTop: 8, fontSize: 14, color: 'white' }}>
-                {person.name}
-              </Text>
-            </View>
-          ))}
+          {COACHES.map((person) => {
+            const selected = coachVoiceId === person.voiceId;
+            return (
+              <TouchableOpacity
+                key={person.voiceId}
+                onPress={() => onSelectCoach(person.voiceId)}
+                activeOpacity={0.85}
+                style={{ alignItems: 'center' }}
+              >
+                <View
+                  style={{
+                    padding: 3,
+                    borderRadius: 56,
+                    borderWidth: selected ? 3 : 0,
+                    borderColor: selected ? '#60a5fa' : 'transparent',
+                  }}
+                >
+                  <Image
+                    source={person.img}
+                    style={{ width: 100, height: 100, borderRadius: 50 }}
+                  />
+                </View>
+                <Text style={{ marginTop: 8, fontSize: 14, color: 'white' }}>
+                  {person.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -188,9 +223,9 @@ export default function ProfileScreen() {
         </Modal>
       </View>
 
-      <View className="mx-6 h-px bg-white/10 my-8" />
+      <View className="mx-6 h-px bg-white/10 my-2" />
 
-      <View className="px-6 gap-8 mb-10">
+      <View className="px-5 gap-2 mb-5">
         <Button
           title="Logout"
           onPress={() => {

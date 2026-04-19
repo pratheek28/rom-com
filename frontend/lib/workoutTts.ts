@@ -6,12 +6,15 @@
  * we read `expo-constants` first, then fall back to `process.env` (Metro inline).
  *
  *   EXPO_PUBLIC_ELEVENLABS_API_KEY
- *   EXPO_PUBLIC_ELEVENLABS_VOICE_ID  (optional)
+ *   EXPO_PUBLIC_ELEVENLABS_VOICE_ID  (optional; default if no coach in AsyncStorage)
  *   EXPO_PUBLIC_ELEVENLABS_MODEL_ID  (optional)
+ *
+ * Profile saves `coachVoiceId` in AsyncStorage; `speakWorkoutCueWithStoredVoice` uses it.
  *
  * Audio is written to a temp file under `expo-file-system` cache — `expo-audio`
  * often plays `file://` MP3 more reliably than `data:` URIs on iOS.
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createAudioPlayer,
   setAudioModeAsync,
@@ -69,10 +72,29 @@ export function isWorkoutTtsConfigured(): boolean {
   return Boolean(env("EXPO_PUBLIC_ELEVENLABS_API_KEY"));
 }
 
-export async function speakWorkoutCue(text: string): Promise<SpeakWorkoutResult> {
+/** Persisted on the profile screen when the user picks a coach (ElevenLabs voice id). */
+export const COACH_VOICE_ID_STORAGE_KEY = "coachVoiceId";
+
+const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+
+export type SpeakWorkoutCueOptions = {
+  /** When set, ElevenLabs uses this voice instead of the env default. */
+  voiceId?: string | null;
+};
+
+export async function speakWorkoutCue(
+  text: string,
+  options?: SpeakWorkoutCueOptions
+): Promise<SpeakWorkoutResult> {
   const apiKey = env("EXPO_PUBLIC_ELEVENLABS_API_KEY");
+  const fromOptions =
+    options?.voiceId != null && String(options.voiceId).trim() !== ""
+      ? String(options.voiceId).trim()
+      : undefined;
   const voiceId =
-    env("EXPO_PUBLIC_ELEVENLABS_VOICE_ID") ?? "21m00Tcm4TlvDq8ikWAM";
+    fromOptions ??
+    env("EXPO_PUBLIC_ELEVENLABS_VOICE_ID") ??
+    DEFAULT_VOICE_ID;
   const modelId =
     env("EXPO_PUBLIC_ELEVENLABS_MODEL_ID") ?? "eleven_v3";
 
@@ -195,4 +217,13 @@ export async function speakWorkoutCue(text: string): Promise<SpeakWorkoutResult>
   }
 
   return { ok: true };
+}
+
+/** Uses the coach voice id saved in AsyncStorage (profile), else the env default. */
+export async function speakWorkoutCueWithStoredVoice(
+  text: string
+): Promise<SpeakWorkoutResult> {
+  const stored = await AsyncStorage.getItem(COACH_VOICE_ID_STORAGE_KEY);
+  const trimmed = stored?.trim();
+  return speakWorkoutCue(text, trimmed ? { voiceId: trimmed } : undefined);
 }
