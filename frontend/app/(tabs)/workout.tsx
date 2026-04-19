@@ -18,12 +18,29 @@ import {
   type WorkoutExerciseId,
   type WorkoutWebConfig,
 } from "@/lib/poseWebMediaPipeHtml";
+import { ConfettiStars } from "@/components/confetti-stars";
+import { WeeklyGoalDeltaBar } from "@/components/progress-bar";
 import {
   isWorkoutTtsConfigured,
   speakWorkoutCue,
 } from "@/lib/workoutTts";
 
 const WEBVIEW_BASE_URL = "https://expo.dev";
+const WORKOUT_GOAL_URL =
+  process.env.EXPO_PUBLIC_WORKOUT_GOAL_URL ??
+  "https://rom-com.onrender.com/workout-goal";
+
+function formatSessionClock(durationMs: number): string {
+  const totalSec = Math.max(0, Math.floor(durationMs / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function msToHoursOneDecimal(durationMs: number): number {
+  const h = durationMs / 3600000;
+  return Math.round(h * 10) / 10;
+}
 const EXERCISE_GIF = require("../../assets/images/curl.gif");
 const SQUAT_GIF = require("../../assets/images/squat.gif");
 
@@ -47,6 +64,7 @@ type WorkoutSummary = {
   sets: number;
   reps: number;
   breakSeconds: number;
+  durationMs: number;
 };
 
 const SECTIONS: {
@@ -140,6 +158,14 @@ export default function WorkoutScreen() {
   const breakOverlayAnim = useRef(new Animated.Value(0)).current;
   const breakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webViewRef = useRef<WebView | null>(null);
+  const breakTimeRef = useRef(false);
+  breakTimeRef.current = breakTime;
+  const workoutStartedAtRef = useRef<number | null>(null);
+
+  const [weeklySnapshot, setWeeklySnapshot] = useState<{
+    curr: number;
+    goal: number;
+  } | null>(null);
 
   useEffect(() => {
     if (selectedExercise) {
@@ -176,8 +202,14 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     if (!selectedExercise || !webViewRef.current) return;
-    const payload = JSON.stringify({ type: "breakState", active: breakTime });
-    webViewRef.current.postMessage(payload);
+    const payload = JSON.stringify({
+      type: "breakState",
+      active: breakTimeRef.current,
+    });
+    const id = requestAnimationFrame(() => {
+      webViewRef.current?.postMessage(payload);
+    });
+    return () => cancelAnimationFrame(id);
   }, [breakTime, selectedExercise]);
 
   useEffect(() => {
@@ -187,6 +219,36 @@ export default function WorkoutScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!workoutSummary) {
+      setWeeklySnapshot(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(WORKOUT_GOAL_URL, { method: "POST" })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json() as Promise<{
+          curr_weekly_hours: number;
+          goal_weekly_hours: number;
+        }>;
+      })
+      .then((d) => {
+        if (!cancelled) {
+          setWeeklySnapshot({
+            curr: d.curr_weekly_hours,
+            goal: d.goal_weekly_hours,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setWeeklySnapshot({ curr: 0, goal: 1 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workoutSummary]);
 
   const openExercisePreview = useCallback((item: ExerciseItem) => {
     setPreviewExercise(item);
@@ -200,6 +262,7 @@ export default function WorkoutScreen() {
     setPreviewExercise(null);
     setWorkoutSummary(null);
     setActiveExerciseTitle("");
+    workoutStartedAtRef.current = null;
     if (breakTimeoutRef.current) {
       clearTimeout(breakTimeoutRef.current);
       breakTimeoutRef.current = null;
@@ -210,6 +273,7 @@ export default function WorkoutScreen() {
     async (exercise: ExerciseItem) => {
       setWebError(null);
       setWorkoutSummary(null);
+      workoutStartedAtRef.current = Date.now();
       setPreviewExercise(null);
       setSelectedExercise(exercise.id);
       setActiveExerciseTitle(exercise.title);
@@ -274,6 +338,10 @@ export default function WorkoutScreen() {
             clearTimeout(breakTimeoutRef.current);
             breakTimeoutRef.current = null;
           }
+          const started = workoutStartedAtRef.current;
+          const durationMs =
+            started != null ? Math.max(0, Date.now() - started) : 0;
+          workoutStartedAtRef.current = null;
           setSelectedExercise(null);
           setPreviewExercise(null);
           setWorkoutSummary({
@@ -281,6 +349,7 @@ export default function WorkoutScreen() {
             sets: data.totalSets ?? activeConfig.sets,
             reps: data.repsPerSet ?? activeConfig.reps,
             breakSeconds: activeConfig.breakSeconds,
+            durationMs,
           });
         }
         if (data.type === "speakRequest" && data.text) {
@@ -315,11 +384,13 @@ export default function WorkoutScreen() {
         <View
       style={{
         flex: 1,
+        position: "relative",
         backgroundColor: "#0B0B0B",
         justifyContent: "space-between",
         padding: 24,
       }}
     >
+      <ConfettiStars active />
       <View
         style={{
           flex: 1,
@@ -334,7 +405,7 @@ export default function WorkoutScreen() {
             marginBottom: 8,
           }}
         >
-          Workout complete
+          Workout Complete
         </Text>
 
         <Text
@@ -351,16 +422,46 @@ export default function WorkoutScreen() {
           style={{
             fontSize: 16,
             color: "#888888",
-            marginBottom: 32,
+            marginBottom: 8,
           }}
         >
-          You got through it — nice work.
+          Nice work.
         </Text>
+
+        <Text
+          style={{
+            fontSize: 15,
+            color: "#bbbbbb",
+            marginBottom: 16,
+          }}
+        >
++{formatSessionClock(workoutSummary.durationMs)} toward your weekly goal
+        </Text>
+
+        {weeklySnapshot ? (
+          <WeeklyGoalDeltaBar
+            baseHours={weeklySnapshot.curr}
+            goalHours={weeklySnapshot.goal}
+            addedHours={msToHoursOneDecimal(workoutSummary.durationMs)}
+          />
+        ) : (
+          <Text
+            style={{
+              color: "#666",
+              fontSize: 13,
+              textAlign: "center",
+              marginTop: 16,
+            }}
+          >
+            Loading weekly goal…
+          </Text>
+        )}
 
         <View
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
+            marginTop: 8,
           }}
         >
           <View style={{ alignItems: "center", flex: 1 }}>
@@ -435,6 +536,7 @@ export default function WorkoutScreen() {
           paddingVertical: 16,
           borderRadius: 12,
           alignItems: "center",
+          zIndex: 100,
         }}
       >
         <Text
@@ -444,7 +546,7 @@ export default function WorkoutScreen() {
             fontWeight: "600",
           }}
         >
-          Back to home
+          Finish
         </Text>
       </Pressable>
     </View>
@@ -626,6 +728,7 @@ export default function WorkoutScreen() {
             <Pressable
               style={styles.backBtn}
               onPress={() => {
+                workoutStartedAtRef.current = null;
                 setSelectedExercise(null);
                 setPreviewExercise(null);
               }}
@@ -650,6 +753,14 @@ export default function WorkoutScreen() {
             mixedContentMode="always"
             allowsFullscreenVideo={false}
             onMessage={onMessage}
+            onLoadEnd={() => {
+              webViewRef.current?.postMessage(
+                JSON.stringify({
+                  type: "breakState",
+                  active: breakTimeRef.current,
+                })
+              );
+            }}
             onError={(ev) =>
               setWebError(ev.nativeEvent.description ?? "WebView error")
             }
