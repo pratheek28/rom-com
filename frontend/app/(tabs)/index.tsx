@@ -1,10 +1,12 @@
-import { StyleSheet, View, Text} from "react-native";
-import { useEffect, useState, useCallback } from "react";
+import { StyleSheet, Text, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useState } from "react";
 import { Calendar } from "@/components/calendar";
 import { ProgressBar } from "@/components/progress-bar";
 import { ThreeDayLog } from "@/components/three-day-log";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
+import { WorkoutDayModal } from "@/components/workout-day-modal";
 
 
 

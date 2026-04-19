@@ -1,4 +1,3 @@
 astrapy
 fastapi
 uvicorn
-pydantic

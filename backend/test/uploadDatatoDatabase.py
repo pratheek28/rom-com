@@ -14,15 +14,15 @@ print(f"Connected to Astra DB: {db.list_collection_names()}")
 
 data = {
     "user_id": str(uuid.uuid4()),
-    "name": "Jane Doe",
-    "curr_weekly_hours": 50,
-    "goal_weekly_hours": 50,
-    "height": 2.26,
+    "name": "John Doe",
+    "curr_weekly_hours": 10,
+    "goal_weekly_hours": 30,
+    "height": 302.26,
     "routine": ["Bench Press", "Squats", "Deadlifts"],
-    "sex": "Female",
-    "streak": 10,
+    "sex": "Male",
+    "streak": 4,
     "timestamp": datetime.now(timezone.utc),
-    "user_weight": 0.5,
+    "user_weight": 10123,
 }
 
 collection = db.get_collection("users")
