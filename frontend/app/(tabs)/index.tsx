@@ -1,29 +1,28 @@
-import { StyleSheet, View, Text} from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 import { useEffect, useState } from "react";
 import { Calendar } from "@/components/calendar";
 import { ProgressBar } from "@/components/progress-bar";
-import { ThreeDayLog } from "@/components/three-day-log";
+
+type WorkoutGoalResponse = {
+  curr_weekly_hours: number;
+  goal_weekly_hours: number;
+};
+
 export default function HomeScreen() {
   const [hoursWorked, SetHoursWorked] = useState(-1);
   const [hoursGoal, SetHoursGoal] = useState(-1);
-<<<<<<< HEAD
+
   useEffect(() => {
     const url =
       process.env.EXPO_PUBLIC_WORKOUT_GOAL_URL ??
-      "http://127.0.0.1:8000/workout-goal";
+      "https://rom-com.onrender.com/workout-goal";
 
     fetch(url, { method: "POST" })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        return response.json();
-=======
-    useEffect(() => {
-    try {
-      fetch("https://rom-com.onrender.com/workout-goal", {
-        method: "POST",
->>>>>>> 40b664826bed87ed57aef72cc8e60f51c38aec02
+        return response.json() as Promise<WorkoutGoalResponse>;
       })
       .then((data) => {
         SetHoursWorked(data.curr_weekly_hours);
@@ -35,9 +34,16 @@ export default function HomeScreen() {
         SetHoursGoal(0);
       });
   }, []);
+
   return (
     <View style={styles.container}>
-      {hoursWorked > 0 ? <ProgressBar hoursWorked={hoursWorked} hoursGoal={hoursGoal} /> : <Text className="text-white text-xl font-semibold text-center mb-20">Loading Data...</Text>}
+      {hoursWorked > 0 ? (
+        <ProgressBar hoursWorked={hoursWorked} hoursGoal={hoursGoal} />
+      ) : (
+        <Text className="text-white text-xl font-semibold text-center mb-20">
+          Loading Data...
+        </Text>
+      )}
       <Calendar />
     </View>
   );
