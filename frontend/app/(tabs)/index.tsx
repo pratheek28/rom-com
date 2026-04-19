@@ -1,26 +1,34 @@
 import { StyleSheet, View, Text} from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Calendar } from "@/components/calendar";
 import { ProgressBar } from "@/components/progress-bar";
 import { ThreeDayLog } from "@/components/three-day-log";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from "@react-navigation/native";
+
+
 export default function HomeScreen() {
   const [hoursWorked, SetHoursWorked] = useState(-1);
   const [hoursGoal, SetHoursGoal] = useState(-1);
-    useEffect(() => {
-    try {
-      fetch("https://rom-com.onrender.com/workout-goal", {
-        method: "POST",
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log(data.curr_weekly_hours);
-          SetHoursWorked(data.curr_weekly_hours);
-          SetHoursGoal(data.goal_weekly_hours);
-        });
-    } catch (e) {
-      console.log(e);
-    }
-  });
+    useFocusEffect(
+      useCallback(() => {
+      AsyncStorage.getItem('name').then(name => {
+        if (name) {
+          fetch("https://rom-com.onrender.com/workout-goal", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              console.log(data.curr_weekly_hours);
+              SetHoursWorked(data.curr_weekly_hours);
+              SetHoursGoal(data.goal_weekly_hours);
+            });
+        }
+      });
+    }, [])
+  )
   return (
     <View style={styles.container}>
       {hoursWorked > 0 ? <ProgressBar hoursWorked={hoursWorked} hoursGoal={hoursGoal} /> : <Text className="text-white text-xl font-semibold text-center mb-20">Loading Data...</Text>}
