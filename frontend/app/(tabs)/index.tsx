@@ -29,6 +29,10 @@ export default function HomeScreen() {
               SetHoursGoal(data.goal_weekly_hours);
             });
         }
+        else {
+          SetHoursWorked(-1);
+          SetHoursGoal(-1);
+        }
       });
     }, [])
   )

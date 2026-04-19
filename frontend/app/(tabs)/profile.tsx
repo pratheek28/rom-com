@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  Button,
 } from 'react-native';
 import ProfilePic from '@/components/profilepic';
 import { useState, useEffect } from 'react';
@@ -133,7 +134,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View className="px-6 gap-4 mt-5 mb-10">
+      <View className="px-6 gap-4 mt-5">
         <Text className="text-white text-2xl font-bold">Language</Text>
 
         <TouchableOpacity
@@ -185,6 +186,19 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Modal>
+      </View>
+
+      <View className="mx-6 h-px bg-white/10 my-8" />
+
+      <View className="px-6 gap-8 mb-10">
+        <Button
+          title="Logout"
+          onPress={() => {
+            AsyncStorage.removeItem('name');
+            setName(null);
+            setUserData(null);
+          }}
+        />
       </View>
     </ScrollView>
   );
